@@ -18,7 +18,7 @@ func main() {
 	arg.MustParse(&args)
 	fmt.Println(args.Vote, args.Unvote)
 
-	client, err := vote.NewClient()
+	client, err := vote.NewClient(nil, nil)
 	if err != nil {
 		log.Println("Failed to create client")
 	}
@@ -40,5 +40,4 @@ func main() {
 			log.Println("Unable to unvote for", v)
 		}
 	}
-
 }

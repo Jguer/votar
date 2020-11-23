@@ -22,18 +22,25 @@ type AURClient struct {
 	password  string
 }
 
-func NewClient() (*AURClient, error) {
+func NewClient(httpClient *http.Client, baseURL *string) (*AURClient, error) {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, err
 	}
 
-	client := &AURClient{url: defaultURL, client: &http.Client{
-		Jar: jar,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}}
+	if httpClient == nil {
+		httpClient = &http.Client{}
+	}
+	httpClient.Jar = jar
+	httpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+
+	client := &AURClient{url: defaultURL, client: httpClient}
+
+	if baseURL != nil {
+		client.url = *baseURL
+	}
 
 	client.urlFormal, err = url.Parse(client.url)
 	if err != nil {
