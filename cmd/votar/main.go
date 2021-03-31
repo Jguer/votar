@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
-	"github.com/Jguer/votar/pkg/vote"
 	"github.com/alexflint/go-arg"
+
+	"github.com/Jguer/votar/pkg/vote"
 )
 
 func main() {
@@ -28,14 +30,14 @@ func main() {
 
 	client.SetCredentials(args.User, args.Password)
 	for _, v := range args.Vote {
-		err := client.Vote(v)
+		err := client.Vote(context.Background(), v)
 		if err != nil {
 			log.Println("Unable to vote for", v, err)
 		}
 	}
 
 	for _, v := range args.Unvote {
-		err := client.Unvote(v)
+		err := client.Unvote(context.Background(), v)
 		if err != nil {
 			log.Println("Unable to unvote for", v)
 		}

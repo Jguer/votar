@@ -23,42 +23,51 @@ linters-settings:
   gocyclo:
     min-complexity: 15
   goimports:
-    local-prefixes: github.com/Jguer/yay/v10
+    local-prefixes: github.com/Jguer/votar
   golint:
     min-confidence: 0
   govet:
     check-shadowing: true
   lll:
     line-length: 140
-  maligned:
-    suggest-new: true
   misspell:
     locale: US
+  nolintlint:
+    allow-leading-space: true # don't require machine-readable nolint directives (i.e. with no leading space)
+    allow-unused: false # report any unused nolint directives
+    require-explanation: false # don't require an explanation for nolint directives
+    require-specific: false # don't require nolint directives to be specific about which linter is being skipped
 
 linters:
-  # please, do not use `enable-all`: it's deprecated and will be removed soon.
-  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
   disable-all: true
   enable:
     - bodyclose
     - deadcode
     - depguard
+    - dogsled
     - dupl
     - errcheck
+    - exportloopref
+    - exhaustive
+    - funlen
     - gochecknoinits
+    - goconst
     - gocritic
+    - gocyclo
     - gofmt
     - goimports
     - golint
+    - gomnd
     - goprintffuncname
     - gosec
     - gosimple
     - govet
     - ineffassign
-    - interfacer
     - lll
     - misspell
     - nakedret
+    - noctx
+    - nolintlint
     - rowserrcheck
     - staticcheck
     - structcheck
@@ -68,19 +77,6 @@ linters:
     - unparam
     - unused
     - varcheck
-    - whitespace
-    - prealloc
-    - maligned
-
-    # disabled want to fix
-    #- scopelint
-    #- gomnd
-    #- goconst
-    #- gocyclo
-    #- funlen
-    #- dogsled
-    # disabled for now
-    # - godox
 
 issues:
   # Excluding configuration per-path, per-linter, per-text and per-source

@@ -1,6 +1,7 @@
 package vote
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -8,6 +9,8 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"regexp"
+
+	"golang.org/x/net/context/ctxhttp"
 )
 
 const defaultURL = "https://aur.archlinux.org"
@@ -55,8 +58,8 @@ func (a *AURClient) SetCredentials(username, password string) {
 	a.password = password
 }
 
-func (a *AURClient) login() error {
-	resp, err := a.client.PostForm(a.url+"/login/", url.Values{
+func (a *AURClient) login(ctx context.Context) error {
+	resp, err := ctxhttp.PostForm(ctx, a.client, a.url+"/login/", url.Values{
 		"user":        []string{a.username},
 		"passwd":      []string{a.password},
 		"remember_me": []string{"on"},
@@ -72,8 +75,8 @@ func (a *AURClient) login() error {
 	return nil
 }
 
-func (a *AURClient) getToken(pkgbase string) (string, error) {
-	resp, err := a.client.Get(fmt.Sprintf("%s/packages/%s", a.url, pkgbase))
+func (a *AURClient) getToken(ctx context.Context, pkgbase string) (string, error) {
+	resp, err := ctxhttp.Get(ctx, a.client, fmt.Sprintf("%s/packages/%s", a.url, pkgbase))
 	if err != nil {
 		return "", err
 	}
@@ -96,14 +99,14 @@ func (a *AURClient) getToken(pkgbase string) (string, error) {
 	return match[1], nil
 }
 
-func (a *AURClient) handleVote(pkgbase string, vote bool) error {
+func (a *AURClient) handleVote(ctx context.Context, pkgbase string, vote bool) error {
 	if len(a.client.Jar.Cookies(a.urlFormal)) == 0 {
-		if err := a.login(); err != nil {
+		if err := a.login(ctx); err != nil {
 			return err
 		}
 	}
 
-	token, err := a.getToken(pkgbase)
+	token, err := a.getToken(ctx, pkgbase)
 	if err != nil {
 		return err
 	}
@@ -121,7 +124,7 @@ func (a *AURClient) handleVote(pkgbase string, vote bool) error {
 		voteURL = fmt.Sprintf("%s/pkgbase/%s/unvote/", a.url, pkgbase)
 	}
 
-	resp, err := a.client.PostForm(voteURL, values)
+	resp, err := ctxhttp.PostForm(ctx, a.client, voteURL, values)
 	if err != nil {
 		return err
 	}
@@ -134,10 +137,10 @@ func (a *AURClient) handleVote(pkgbase string, vote bool) error {
 	return nil
 }
 
-func (a *AURClient) Vote(pkgbase string) error {
-	return a.handleVote(pkgbase, true)
+func (a *AURClient) Vote(ctx context.Context, pkgbase string) error {
+	return a.handleVote(ctx, pkgbase, true)
 }
 
-func (a *AURClient) Unvote(pkgbase string) error {
-	return a.handleVote(pkgbase, false)
+func (a *AURClient) Unvote(ctx context.Context, pkgbase string) error {
+	return a.handleVote(ctx, pkgbase, false)
 }
