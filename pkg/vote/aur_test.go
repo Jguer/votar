@@ -14,6 +14,7 @@ import (
 const cookieString = "AURSID=sidexample; HttpOnly; Max-Age=2592000; Path=/; SameSite=strict; Secure"
 
 func TestNewClient(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		httpClient *http.Client
 		baseURL    *string
@@ -65,6 +66,7 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestMissingCredentials(t *testing.T) {
+	t.Parallel()
 	client, err := NewClient()
 	require.NoError(t, err)
 
@@ -93,6 +95,7 @@ func (m *MockClient) Do(req *http.Request) (*http.Response, error) {
 }
 
 func TestLoginRequest(t *testing.T) {
+	t.Parallel()
 	client, err := NewClient(WithHTTPClient(&MockClient{
 		t:       t,
 		wantURL: "https://aur.archlinux.org/login",
@@ -118,6 +121,7 @@ func TestLoginRequest(t *testing.T) {
 }
 
 func TestVote(t *testing.T) {
+	t.Parallel()
 	client, err := NewClient(WithHTTPClient(&MockClient{
 		t:       t,
 		wantURL: "https://aur.archlinux.org/pkgbase/votar/vote",
@@ -139,6 +143,7 @@ func TestVote(t *testing.T) {
 }
 
 func TestUnvote(t *testing.T) {
+	t.Parallel()
 	client, err := NewClient(WithHTTPClient(&MockClient{
 		t:       t,
 		wantURL: "https://aur.archlinux.org/pkgbase/votar/unvote",
