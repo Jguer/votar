@@ -7,8 +7,8 @@ on:
     branches: [ "main" ]
 
 jobs:
-
-  build:
+  test:
+    name: Build & Test
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -17,4 +17,4 @@ jobs:
       with:
         go-version: 1.18
     - name: Test
-      run: go test -covermode=atomic -timeout=3m ./...content
+      run: go test -covermode=atomic -timeout=3m ./...
