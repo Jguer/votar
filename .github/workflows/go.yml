@@ -17,4 +17,4 @@ jobs:
       with:
         go-version: 1.18
     - name: Test
-      run: test -covermode=atomic -timeout=3m ./...content
+      run: go test -covermode=atomic -timeout=3m ./...content
