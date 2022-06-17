@@ -1,3 +1,4 @@
+// Errors
 package vote
 
 import (
