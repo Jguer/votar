@@ -16,8 +16,7 @@ func Example() {
 
 	client.SetCredentials("user", "password")
 
-	err = client.Vote(context.Background(), "package")
-	if err != nil {
+	if err = client.Vote(context.Background(), "package"); err != nil {
 		log.Println("Failed to vote for", "package")
 	}
 }
