@@ -81,7 +81,7 @@ func (a *AURWebClient) login(ctx context.Context) error {
 		return ErrNoCredentials
 	}
 
-	loginURL := fmt.Sprintf("%s/login?next=packages", a.baseURL)
+	loginURL := fmt.Sprintf("%s/login", a.baseURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, loginURL, strings.NewReader(url.Values{
 		"user":        []string{a.username},
 		"passwd":      []string{a.password},
