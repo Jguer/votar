@@ -2,145 +2,179 @@ package vote
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"regexp"
-
-	"golang.org/x/net/context/ctxhttp"
+	"strings"
 )
 
-const defaultURL = "https://aur.archlinux.org"
+const (
+	defaultURL       = "https://aur.archlinux.org"
+	defaultUserAgent = "votar/1.0.0"
+)
 
-var tokenExpr = regexp.MustCompile(`<input type="hidden" name="token"\s+value="([0-9a-f]+)" />`)
-
-type AURClient struct {
-	client    *http.Client
-	url       string
-	urlFormal *url.URL
-	username  string
-	password  string
+type AURWebClient struct {
+	httpClient HTTPRequestDoer
+	baseURL    string
+	urlFormal  *url.URL
+	username   string
+	password   string
+	userAgent  string
+	cookieJar  *cookiejar.Jar
 }
 
-func NewClient(httpClient *http.Client, baseURL *string) (*AURClient, error) {
+// ClientOption allows setting custom parameters during construction.
+type ClientOption func(*AURWebClient) error
+
+func NewClient(opts ...ClientOption) (*AURWebClient, error) {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, err
 	}
 
-	if httpClient == nil {
-		httpClient = &http.Client{}
-	}
-	httpClient.Jar = jar
-	httpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
+	client := AURWebClient{}
 
-	client := &AURClient{url: defaultURL, client: httpClient}
-
-	if baseURL != nil {
-		client.url = *baseURL
+	for _, o := range opts {
+		if o == nil {
+			continue
+		}
+		if errOpt := o(&client); errOpt != nil {
+			return nil, errOpt
+		}
 	}
 
-	client.urlFormal, err = url.Parse(client.url)
+	if client.httpClient == nil {
+		httpClient := &http.Client{
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			}}
+
+		client.httpClient = httpClient
+	}
+
+	if client.baseURL == "" {
+		client.baseURL = defaultURL
+	}
+
+	if client.userAgent == "" {
+		client.userAgent = defaultUserAgent
+	}
+
+	client.cookieJar = jar
+	client.urlFormal, err = url.Parse(client.baseURL)
 	if err != nil {
 		return nil, err
 	}
 
-	return client, nil
+	return &client, nil
 }
 
-func (a *AURClient) SetCredentials(username, password string) {
+func (a *AURWebClient) SetCredentials(username, password string) {
 	a.username = username
 	a.password = password
 }
 
-func (a *AURClient) login(ctx context.Context) error {
-	resp, err := ctxhttp.PostForm(ctx, a.client, a.url+"/login/", url.Values{
+func (a *AURWebClient) login(ctx context.Context) error {
+	if a.username == "" || a.password == "" {
+		return ErrNoCredentials
+	}
+
+	loginURL := fmt.Sprintf("%s/login?next=packages", a.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, loginURL, strings.NewReader(url.Values{
 		"user":        []string{a.username},
 		"passwd":      []string{a.password},
+		"referer":     []string{a.baseURL},
 		"remember_me": []string{"on"},
-	})
+		"next":        []string{"packages"},
+	}.Encode()))
 	if err != nil {
 		return err
 	}
 
+	a.setHeaders(req, loginURL)
+
+	resp, err := a.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
 	defer resp.Body.Close()
 
-	a.client.Jar.SetCookies(a.urlFormal, resp.Cookies())
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode >= http.StatusBadRequest {
+		return &ErrLoginFailed{status: resp.StatusCode, body: string(bodyBytes)}
+	}
+
+	a.cookieJar.SetCookies(a.urlFormal, resp.Cookies())
 
 	return nil
 }
 
-func (a *AURClient) getToken(ctx context.Context, pkgbase string) (string, error) {
-	resp, err := ctxhttp.Get(ctx, a.client, fmt.Sprintf("%s/packages/%s", a.url, pkgbase))
-	if err != nil {
-		return "", err
+func (a *AURWebClient) setHeaders(req *http.Request, refererURL string) {
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Referer", refererURL)
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	req.Header.Set("Origin", a.baseURL)
+	req.Header.Set("Upgrade-Insecure-Requests", "1")
+	req.Header.Set("User-Agent", a.userAgent)
+	for _, cookie := range a.cookieJar.Cookies(a.urlFormal) {
+		req.AddCookie(cookie)
 	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", errors.New("token status not OK")
-	}
-
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	match := tokenExpr.FindStringSubmatch(string(bodyBytes))
-	if match == nil {
-		return "", errors.New("no match for token")
-	}
-	return match[1], nil
 }
 
-func (a *AURClient) handleVote(ctx context.Context, pkgbase string, vote bool) error {
-	if len(a.client.Jar.Cookies(a.urlFormal)) == 0 {
+func (a *AURWebClient) handleVote(ctx context.Context, pkgbase string, vote bool) error {
+	if len(a.cookieJar.Cookies(a.urlFormal)) == 0 {
 		if err := a.login(ctx); err != nil {
 			return err
 		}
 	}
 
-	token, err := a.getToken(ctx, pkgbase)
-	if err != nil {
-		return err
-	}
-
-	values := url.Values{
-		"token": []string{token},
-	}
-
+	values := url.Values{}
+	packageURL := fmt.Sprintf("%s/pkgbase/%s", a.baseURL, pkgbase)
 	voteURL := ""
 	if vote {
 		values.Add("do_Vote", "Vote+for+this+package")
-		voteURL = fmt.Sprintf("%s/pkgbase/%s/vote/", a.url, pkgbase)
+		voteURL = fmt.Sprintf("%s/vote", packageURL)
 	} else {
-		values.Add("do_Vote", "Remove+vote")
-		voteURL = fmt.Sprintf("%s/pkgbase/%s/unvote/", a.url, pkgbase)
+		values.Add("do_UnVote", "Remove+vote")
+		voteURL = fmt.Sprintf("%s/unvote", packageURL)
 	}
 
-	resp, err := ctxhttp.PostForm(ctx, a.client, voteURL, values)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, voteURL, strings.NewReader(values.Encode()))
 	if err != nil {
 		return err
 	}
 
-	if resp.StatusCode != http.StatusFound {
-		return errors.New("unable to vote")
+	a.setHeaders(req, packageURL)
+
+	resp, err := a.httpClient.Do(req)
+	if err != nil {
+		return err
 	}
 
-	resp.Body.Close()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusSeeOther {
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		return &ErrVoteFailed{status: resp.StatusCode, cookies: a.cookieJar.Cookies(a.urlFormal), body: string(bodyBytes)}
+	}
+
 	return nil
 }
 
-func (a *AURClient) Vote(ctx context.Context, pkgbase string) error {
+func (a *AURWebClient) Vote(ctx context.Context, pkgbase string) error {
 	return a.handleVote(ctx, pkgbase, true)
 }
 
-func (a *AURClient) Unvote(ctx context.Context, pkgbase string) error {
+func (a *AURWebClient) Unvote(ctx context.Context, pkgbase string) error {
 	return a.handleVote(ctx, pkgbase, false)
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/alexflint/go-arg"
@@ -18,9 +17,8 @@ func main() {
 		Password string   `arg:"env:AUR_PASSWORD"`
 	}
 	arg.MustParse(&args)
-	fmt.Println(args.Vote, args.Unvote)
 
-	client, err := vote.NewClient(nil, nil)
+	client, err := vote.NewClient(nil, nil, nil)
 	if err != nil {
 		log.Println("Failed to create client")
 	}
@@ -32,14 +30,14 @@ func main() {
 	for _, v := range args.Vote {
 		err := client.Vote(context.Background(), v)
 		if err != nil {
-			log.Println("Unable to vote for", v, err)
+			log.Println("Unable to vote for:", v, "\nerr:", err)
 		}
 	}
 
 	for _, v := range args.Unvote {
 		err := client.Unvote(context.Background(), v)
 		if err != nil {
-			log.Println("Unable to unvote for", v)
+			log.Println("Unable to unvote for:", v, "\nerr:", err)
 		}
 	}
 }
