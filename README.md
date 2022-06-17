@@ -1,7 +1,7 @@
 # votar
 AUR vote utility
 
-## as a CLI Util
+## As a CLI Util
 
 *go install*
 
