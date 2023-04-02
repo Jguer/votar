@@ -1,7 +1,18 @@
+[![votar-git](https://img.shields.io/aur/version/votar-git?color=1793d1&label=votar-git&logo=arch-linux&style=for-the-badge)](https://aur.archlinux.org/packages/votar-git/)
+
 # votar
 AUR vote utility
 
 ## As a CLI Util
+
+*AUR install*
+
+```sh
+pacman -S --needed git base-devel
+git clone https://aur.archlinux.org/votar-git.git
+cd votar-git
+makepkg -si
+```
 
 *go install*
 
